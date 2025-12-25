@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Wrapper - Text Formatting Tool</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-space-shuttle"></i> Space Wrapper</h1>
+            <p class="subtitle">Normalize spacing and line breaks without modifying content</p>
+        </header>
+
+        <div class="mode-selector">
+            <div class="mode-option">
+                <input type="radio" id="modeA" name="mode" value="A" checked>
+                <label for="modeA">
+                    <strong>Mode A: Single Paragraph</strong>
+                    <span>Merge everything into one clean paragraph</span>
+                </label>
+            </div>
+            <div class="mode-option">
+                <input type="radio" id="modeB" name="mode" value="B">
+                <label for="modeB">
+                    <strong>Mode B: Clean Paragraph</strong>
+                    <span>Preserve paragraph structure, fix formatting</span>
+                </label>
+            </div>
+            <div class="mode-option">
+                <input type="radio" id="modeC" name="mode" value="C">
+                <label for="modeC">
+                    <strong>Mode C: Hard Normalization</strong>
+                    <span>Aggressive cleanup for heavily broken text</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="input-section">
+            <div class="section-header">
+                <h2><i class="fas fa-keyboard"></i> Input Text</h2>
+                <div class="input-stats">
+                    <span id="inputWordCount">Words: 0</span>
+                    <span id="inputCharCount">Chars: 0</span>
+                    <span id="inputLineCount">Lines: 0</span>
+                </div>
+            </div>
+            <textarea id="inputText" placeholder="Paste your text here... Supports batch input with blank line separation."></textarea>
+            <div class="button-group">
+                <button id="clearBtn" class="btn secondary">
+                    <i class="fas fa-trash-alt"></i> Clear Input
+                </button>
+                <button id="processBtn" class="btn primary">
+                    <i class="fas fa-magic"></i> Process Text
+                </button>
+            </div>
+        </div>
+
+        <div class="output-section">
+            <div class="section-header">
+                <h2><i class="fas fa-file-alt"></i> Formatted Output</h2>
+                <div class="output-stats">
+                    <span id="outputWordCount">Words: 0</span>
+                    <span id="outputCharCount">Chars: 0</span>
+                    <span id="lineBreaksRemoved">Line breaks removed: 0</span>
+                </div>
+            </div>
+            <div class="warning-banner" id="warningBanner" style="display: none;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="warningText">Warning: Content alteration detected!</span>
+            </div>
+            <div class="output-container">
+                <pre id="outputText"></pre>
+                <button id="copyBtn" class="btn copy-btn" disabled>
+                    <i class="far fa-copy"></i> Copy to Clipboard
+                </button>
+            </div>
+            <div class="verification">
+                <div class="verification-item">
+                    <span class="verification-label">Word Count Match:</span>
+                    <span id="wordMatch" class="verification-value match">✓</span>
+                </div>
+                <div class="verification-item">
+                    <span class="verification-label">Character Count Match:</span>
+                    <span id="charMatch" class="verification-value match">✓</span>
+                </div>
+                <div class="verification-item">
+                    <span class="verification-label">Content Integrity:</span>
+                    <span id="contentMatch" class="verification-value match">✓</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <div class="info-box">
+                <h3><i class="fas fa-shield-alt"></i> Protected Content</h3>
+                <p>These elements are preserved exactly:</p>
+                <ul>
+                    <li>URLs and email addresses</li>
+                    <li>Text inside backticks: <code>`like this`</code></li>
+                    <li>Inline code fragments</li>
+                    <li>File paths and code blocks</li>
+                </ul>
+            </div>
+            <div class="info-box">
+                <h3><i class="fas fa-exclamation-circle"></i> Important</h3>
+                <p>This tool only modifies spacing and line breaks. It will never:</p>
+                <ul>
+                    <li>Rewrite text or change meaning</li>
+                    <li>Fix grammar or improve clarity</li>
+                    <li>Summarize or shorten content</li>
+                    <li>Alter punctuation or casing</li>
+                </ul>
+            </div>
+        </div>
+
+        <footer>
+            <p>Space Wrapper - Deterministic Text Formatting Tool</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
