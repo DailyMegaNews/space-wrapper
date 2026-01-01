@@ -87,8 +87,8 @@ class SpaceWrapper {
     }
     
     processText() {
-        const input = this.inputText.value.trim();
-        if (!input) {
+        const input = this.inputText.value;
+        if (!input.trim()) {
             this.outputText.textContent = '';
             return;
         }
@@ -126,23 +126,23 @@ class SpaceWrapper {
     }
     
     processBatch(batch) {
-        // Step 1: Protect content
-        const protectedText = this.protectContent(batch);
+        // Step 1: Protect content and structure
+        const protectedText = this.protectStructureAndContent(batch);
         
-        // Step 2: Normalize whitespace
-        const normalized = this.normalizeWhitespace(protectedText);
+        // Step 2: Normalize whitespace while preserving structure
+        const normalized = this.normalizeWhitespaceWithStructure(protectedText);
         
         // Step 3: Apply mode-specific processing
         let processed;
         switch(this.mode) {
             case 'A':
-                processed = this.processModeA(normalized);
+                processed = this.processModeAWithStructure(normalized);
                 break;
             case 'B':
-                processed = this.processModeB(normalized);
+                processed = this.processModeBWithStructure(normalized);
                 break;
             case 'C':
-                processed = this.processModeC(normalized);
+                processed = this.processModeCWithStructure(normalized);
                 break;
             default:
                 processed = normalized;
@@ -151,16 +151,58 @@ class SpaceWrapper {
         // Step 4: Restore protected content
         const restored = this.restoreProtectedContent(processed);
         
-        // Step 5: Final cleanup
-        return this.finalCleanup(restored);
+        // Step 5: Final cleanup with structure awareness
+        return this.finalCleanupWithStructure(restored);
     }
     
-    protectContent(text) {
-        // Store original text for restoration
-        const original = text;
+    protectStructureAndContent(text) {
+        let protectedText = text;
         
-        // Patterns for protected content
+        // Protect multi-line blocks first (code blocks, HTML blocks)
+        protectedText = this.protectMultiLineBlocks(protectedText);
+        
+        // Patterns for protected content (including structural elements)
         const patterns = [
+            // Markdown headings
+            {
+                regex: /^(#{1,6}\s+.*)$/gm,
+                type: 'markdown_heading'
+            },
+            // HTML headings and title tags
+            {
+                regex: /^(<(h[1-6]|title)(?:\s[^>]*)?>.*?<\/\2>)$/gmi,
+                type: 'html_heading'
+            },
+            // List items (markdown)
+            {
+                regex: /^(\s*)([\*\-\+]|\d+\.|[a-z]\.)\s+.*$/gm,
+                type: 'list_item'
+            },
+            // HTML list items
+            {
+                regex: /^(\s*)<li(?:\s[^>]*)?>.*?<\/li>$/gmi,
+                type: 'html_list_item'
+            },
+            // Blockquotes
+            {
+                regex: /^(>\s+.*)$/gm,
+                type: 'blockquote'
+            },
+            // Horizontal rules
+            {
+                regex: /^(\*\*\*|---|___)\s*$/gm,
+                type: 'horizontal_rule'
+            },
+            // Table rows
+            {
+                regex: /^(\|.*\|)$/gm,
+                type: 'table_row'
+            },
+            // Single HTML tags (self-closing or opening)
+            {
+                regex: /^(<\/?[a-z][^>]*>)$/gmi,
+                type: 'html_tag'
+            },
             // URLs
             { 
                 regex: /(https?:\/\/[^\s]+|www\.[^\s]+\.[^\s]+)/gi,
@@ -183,17 +225,16 @@ class SpaceWrapper {
             }
         ];
         
-        let protectedText = text;
-        
         // Replace each protected item with a token
         patterns.forEach(pattern => {
             protectedText = protectedText.replace(pattern.regex, (match) => {
                 // Don't protect if it's already inside a protected token
-                if (match.includes('__PROTECTED_')) {
+                if (match.includes('__PROTECTED_') || match.includes('__STRUCTURED_') || 
+                    match.includes('__MULTILINE_') || match.includes('__HTML_BLOCK_')) {
                     return match;
                 }
                 
-                const token = `__PROTECTED_${this.nextTokenId}__`;
+                const token = `__STRUCTURED_${this.nextTokenId}__`;
                 this.protectedMap.set(token, match);
                 this.nextTokenId++;
                 return token;
@@ -203,12 +244,302 @@ class SpaceWrapper {
         return protectedText;
     }
     
+    protectMultiLineBlocks(text) {
+        let protectedText = text;
+        
+        // Protect code blocks (triple backticks or tildes)
+        const codeBlockRegex = /(```[^`\n]*\n[\s\S]*?\n```|~~~[^~\n]*\n[\s\S]*?\n~~~)/g;
+        protectedText = protectedText.replace(codeBlockRegex, (match) => {
+            const token = `__MULTILINE_BLOCK_${this.nextTokenId}__`;
+            this.protectedMap.set(token, match);
+            this.nextTokenId++;
+            return token;
+        });
+        
+        // Protect HTML blocks (div, pre, code with content)
+        const htmlBlockRegex = /(<(pre|code|div|section|article|header|footer|nav|aside|main|figure)(?:\s[^>]*)?>[\s\S]*?<\/\2>)/gi;
+        protectedText = protectedText.replace(htmlBlockRegex, (match) => {
+            const token = `__HTML_BLOCK_${this.nextTokenId}__`;
+            this.protectedMap.set(token, match);
+            this.nextTokenId++;
+            return token;
+        });
+        
+        // Protect script and style blocks
+        const scriptStyleRegex = /(<(script|style)(?:\s[^>]*)?>[\s\S]*?<\/\2>)/gi;
+        protectedText = protectedText.replace(scriptStyleRegex, (match) => {
+            const token = `__HTML_BLOCK_${this.nextTokenId}__`;
+            this.protectedMap.set(token, match);
+            this.nextTokenId++;
+            return token;
+        });
+        
+        return protectedText;
+    }
+    
+    normalizeWhitespaceWithStructure(text) {
+        const lines = text.split('\n');
+        const processedLines = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            
+            // Check if line contains protected content
+            const isProtected = line.includes('__STRUCTURED_') || 
+                              line.includes('__MULTILINE_BLOCK_') || 
+                              line.includes('__HTML_BLOCK_');
+            
+            if (!isProtected) {
+                // For regular lines, normalize internal whitespace
+                // Replace tabs and multiple spaces with single space
+                line = line.replace(/[ \t]+/g, ' ');
+                
+                // Normalize other Unicode whitespace characters
+                line = line.replace(/[\r\f\v\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g, ' ');
+                
+                // Remove trailing spaces
+                line = line.trimEnd();
+            }
+            
+            processedLines.push(line);
+        }
+        
+        return processedLines.join('\n');
+    }
+    
+    processModeAWithStructure(text) {
+        // Single Paragraph Mode - but preserve structural lines
+        const lines = text.split('\n');
+        const processedLines = [];
+        let currentParagraph = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+            
+            // Check if line should be preserved (contains protected content)
+            const shouldPreserve = 
+                line.includes('__STRUCTURED_') || 
+                line.includes('__MULTILINE_BLOCK_') || 
+                line.includes('__HTML_BLOCK_');
+            
+            if (shouldPreserve || trimmed === '') {
+                // Process current paragraph if exists
+                if (currentParagraph.length > 0) {
+                    processedLines.push(currentParagraph.join(' '));
+                    currentParagraph = [];
+                }
+                
+                if (shouldPreserve) {
+                    processedLines.push(line); // Keep protected token as-is
+                } else if (trimmed === '' && processedLines.length > 0) {
+                    // Keep only one blank line between content
+                    if (processedLines[processedLines.length - 1] !== '') {
+                        processedLines.push('');
+                    }
+                }
+            } else {
+                // This is regular text that should be merged
+                currentParagraph.push(trimmed);
+            }
+        }
+        
+        // Process any remaining paragraph
+        if (currentParagraph.length > 0) {
+            processedLines.push(currentParagraph.join(' '));
+        }
+        
+        // Remove leading/trailing blank lines
+        while (processedLines.length > 0 && processedLines[0] === '') {
+            processedLines.shift();
+        }
+        while (processedLines.length > 0 && processedLines[processedLines.length - 1] === '') {
+            processedLines.pop();
+        }
+        
+        return processedLines.join('\n');
+    }
+    
+    processModeBWithStructure(text) {
+        // Clean Paragraph Mode - preserve all structure and paragraphs
+        const lines = text.split('\n');
+        const processedLines = [];
+        let currentParagraph = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+            
+            // Check if line should break paragraphs
+            const isStructural = 
+                line.includes('__STRUCTURED_') || 
+                line.includes('__MULTILINE_BLOCK_') || 
+                line.includes('__HTML_BLOCK_');
+            
+            if (trimmed === '') {
+                // Blank line - process current paragraph if exists
+                if (currentParagraph.length > 0) {
+                    processedLines.push(currentParagraph.join(' '));
+                    currentParagraph = [];
+                }
+                // Add blank line (will be deduplicated later)
+                processedLines.push('');
+            } else if (isStructural) {
+                // Structural element - process current paragraph first
+                if (currentParagraph.length > 0) {
+                    processedLines.push(currentParagraph.join(' '));
+                    currentParagraph = [];
+                }
+                processedLines.push(line); // Keep protected token as-is
+            } else {
+                // Regular text - add to current paragraph
+                currentParagraph.push(trimmed);
+            }
+        }
+        
+        // Process any remaining paragraph
+        if (currentParagraph.length > 0) {
+            processedLines.push(currentParagraph.join(' '));
+        }
+        
+        // Clean up: remove consecutive blank lines (keep only one)
+        let result = [];
+        let lastWasBlank = false;
+        
+        for (let i = 0; i < processedLines.length; i++) {
+            if (processedLines[i] === '') {
+                if (!lastWasBlank) {
+                    result.push('');
+                }
+                lastWasBlank = true;
+            } else {
+                result.push(processedLines[i]);
+                lastWasBlank = false;
+            }
+        }
+        
+        // Remove leading/trailing blank lines
+        while (result.length > 0 && result[0] === '') {
+            result.shift();
+        }
+        while (result.length > 0 && result[result.length - 1] === '') {
+            result.pop();
+        }
+        
+        return result.join('\n');
+    }
+    
+    processModeCWithStructure(text) {
+        // Hard Normalization Mode - but still preserve protected structure
+        const lines = text.split('\n');
+        const processedLines = [];
+        let currentContent = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+            
+            // Check if line should be preserved
+            const shouldPreserve = 
+                line.includes('__STRUCTURED_') || 
+                line.includes('__MULTILINE_BLOCK_') || 
+                line.includes('__HTML_BLOCK_');
+            
+            if (shouldPreserve) {
+                // Process any accumulated content first
+                if (currentContent.length > 0) {
+                    processedLines.push(currentContent.join(' '));
+                    currentContent = [];
+                }
+                // Preserve structural elements
+                processedLines.push(line);
+            } else if (trimmed) {
+                // For Mode C: remove line breaks but keep content
+                currentContent.push(trimmed);
+            }
+        }
+        
+        // Process any remaining content
+        if (currentContent.length > 0) {
+            processedLines.push(currentContent.join(' '));
+        }
+        
+        // Join everything with spaces, but keep structural elements on separate lines
+        let result = [];
+        for (let i = 0; i < processedLines.length; i++) {
+            const line = processedLines[i];
+            if (line.includes('__STRUCTURED_') || 
+                line.includes('__MULTILINE_BLOCK_') || 
+                line.includes('__HTML_BLOCK_')) {
+                result.push(line);
+            } else if (line.trim()) {
+                // For non-structural content, join with previous non-structural if exists
+                if (result.length > 0 && 
+                    !result[result.length - 1].includes('__STRUCTURED_') &&
+                    !result[result.length - 1].includes('__MULTILINE_BLOCK_') &&
+                    !result[result.length - 1].includes('__HTML_BLOCK_')) {
+                    result[result.length - 1] = result[result.length - 1] + ' ' + line.trim();
+                } else {
+                    result.push(line.trim());
+                }
+            }
+        }
+        
+        return result.join('\n');
+    }
+    
+    finalCleanupWithStructure(text) {
+        // Clean up spacing while preserving structure
+        const lines = text.split('\n');
+        const cleanedLines = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            
+            // Check if line contains protected content
+            const isProtected = 
+                line.includes('__STRUCTURED_') || 
+                line.includes('__MULTILINE_BLOCK_') || 
+                line.includes('__HTML_BLOCK_');
+            
+            if (!isProtected && line.trim()) {
+                // Clean up regular lines
+                // Remove multiple spaces (but not single spaces)
+                line = line.replace(/[ ]+/g, ' ');
+                // Trim
+                line = line.trim();
+            }
+            
+            if (line || isProtected) {
+                // Keep non-empty lines and protected lines (even if empty-looking)
+                cleanedLines.push(line);
+            }
+        }
+        
+        // Remove trailing empty lines (but keep last line if it's structural)
+        while (cleanedLines.length > 0 && 
+               cleanedLines[cleanedLines.length - 1] === '' &&
+               !cleanedLines[cleanedLines.length - 1].includes('__STRUCTURED_') &&
+               !cleanedLines[cleanedLines.length - 1].includes('__MULTILINE_BLOCK_') &&
+               !cleanedLines[cleanedLines.length - 1].includes('__HTML_BLOCK_')) {
+            cleanedLines.pop();
+        }
+        
+        return cleanedLines.join('\n');
+    }
+    
     restoreProtectedContent(text) {
         let restored = text;
         
-        // Replace tokens with original content
-        this.protectedMap.forEach((original, token) => {
-            restored = restored.replace(new RegExp(this.escapeRegExp(token), 'g'), original);
+        // Replace tokens with original content in reverse order
+        // (so we don't replace parts of other tokens)
+        const tokens = Array.from(this.protectedMap.keys())
+            .sort((a, b) => b.length - a.length); // Longest first
+        
+        tokens.forEach(token => {
+            const original = this.protectedMap.get(token);
+            const escapedToken = this.escapeRegExp(token);
+            restored = restored.replace(new RegExp(escapedToken, 'g'), original);
         });
         
         return restored;
@@ -216,84 +547,6 @@ class SpaceWrapper {
     
     escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-    
-    normalizeWhitespace(text) {
-        // Replace all Unicode whitespace with standard space
-        let normalized = text.replace(/[\t\r\f\v\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g, ' ');
-        
-        // Replace multiple spaces with single space
-        normalized = normalized.replace(/[ ]+/g, ' ');
-        
-        // Normalize line endings to \n
-        normalized = normalized.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        
-        return normalized;
-    }
-    
-    processModeA(text) {
-        // Single Paragraph Mode
-        let processed = text;
-        
-        // Replace all line breaks with space
-        processed = processed.replace(/\n/g, ' ');
-        
-        // Collapse multiple spaces
-        processed = processed.replace(/[ ]+/g, ' ');
-        
-        // Trim leading/trailing whitespace
-        processed = processed.trim();
-        
-        return processed;
-    }
-    
-    processModeB(text) {
-        // Clean Paragraph Mode
-        // Split by multiple newlines (paragraphs)
-        const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim());
-        
-        const processedParagraphs = paragraphs.map(paragraph => {
-            // Replace single line breaks within paragraph with space
-            let processed = paragraph.replace(/\n/g, ' ');
-            
-            // Collapse multiple spaces
-            processed = processed.replace(/[ ]+/g, ' ');
-            
-            // Trim each paragraph
-            return processed.trim();
-        });
-        
-        // Join paragraphs with single blank line
-        return processedParagraphs.join('\n\n');
-    }
-    
-    processModeC(text) {
-        // Hard Normalization Mode
-        let processed = text;
-        
-        // Remove ALL line breaks
-        processed = processed.replace(/\n/g, '');
-        
-        // Collapse ALL whitespace to single spaces
-        processed = processed.replace(/\s+/g, ' ');
-        
-        // Trim
-        processed = processed.trim();
-        
-        return processed;
-    }
-    
-    finalCleanup(text) {
-        // Final safety checks
-        let cleaned = text;
-        
-        // Ensure no double spaces
-        cleaned = cleaned.replace(/[ ]+/g, ' ');
-        
-        // Trim but preserve intentional spacing in protected content
-        cleaned = cleaned.trim();
-        
-        return cleaned;
     }
     
     updateOutputStats(original, processed) {
@@ -323,81 +576,4 @@ class SpaceWrapper {
         
         // Word count verification
         const originalWords = original.trim() ? original.trim().split(/\s+/).length : 0;
-        const processedWords = processed.trim() ? processed.trim().split(/\s+/).length : 0;
-        const wordMatch = originalWords === processedWords;
-        
-        // Character count verification (non-whitespace)
-        const charMatch = originalNonSpace.length === processedNonSpace.length;
-        
-        // Content verification - check if all original non-space chars exist in processed text
-        let contentVerified = true;
-        if (charMatch) {
-            // For efficiency, compare sorted characters or use Set comparison
-            const originalSet = new Set(originalNonSpace);
-            const processedSet = new Set(processedNonSpace);
-            
-            // Check if all characters from original exist in processed
-            for (let char of originalSet) {
-                if (!processedSet.has(char)) {
-                    contentVerified = false;
-                    break;
-                }
-            }
-        } else {
-            contentVerified = false;
-        }
-        
-        // Update verification indicators
-        this.updateVerificationIndicator(this.wordMatch, wordMatch, 'Word count mismatch');
-        this.updateVerificationIndicator(this.charMatch, charMatch, 'Character count mismatch');
-        this.updateVerificationIndicator(this.contentMatch, contentVerified, 'Content alteration detected');
-        
-        // Show warning if any mismatch
-        if (!wordMatch || !charMatch || !contentVerified) {
-            this.showWarning('Content verification failed. Review output carefully.');
-        }
-    }
-    
-    updateVerificationIndicator(element, isMatch, warningText) {
-        if (isMatch) {
-            element.textContent = '✓';
-            element.className = 'verification-value match';
-        } else {
-            element.textContent = '✗';
-            element.className = 'verification-value mismatch';
-            element.title = warningText;
-        }
-    }
-    
-    showWarning(message) {
-        this.warningText.textContent = message;
-        this.warningBanner.style.display = 'flex';
-    }
-    
-    async copyToClipboard() {
-        const text = this.outputText.textContent;
-        
-        try {
-            await navigator.clipboard.writeText(text);
-            
-            // Visual feedback
-            const originalText = this.copyBtn.innerHTML;
-            this.copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-            this.copyBtn.style.background = 'var(--success-color)';
-            
-            setTimeout(() => {
-                this.copyBtn.innerHTML = originalText;
-                this.copyBtn.style.background = '';
-            }, 2000);
-            
-        } catch (err) {
-            console.error('Failed to copy: ', err);
-            this.showWarning('Failed to copy to clipboard');
-        }
-    }
-}
-
-// Initialize the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new SpaceWrapper();
-});
+        const processed
