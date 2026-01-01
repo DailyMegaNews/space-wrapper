@@ -11,7 +11,7 @@
     <div class="container">
         <header>
             <h1><i class="fas fa-space-shuttle"></i> Space Wrapper</h1>
-            <p class="subtitle">Normalize spacing and line breaks without modifying content</p>
+            <p class="subtitle">Normalize spacing and line breaks while preserving document structure</p>
         </header>
 
         <div class="mode-selector">
@@ -19,21 +19,21 @@
                 <input type="radio" id="modeA" name="mode" value="A" checked>
                 <label for="modeA">
                     <strong>Mode A: Single Paragraph</strong>
-                    <span>Merge everything into one clean paragraph</span>
+                    <span>Merge paragraphs into one, preserve structure</span>
                 </label>
             </div>
             <div class="mode-option">
                 <input type="radio" id="modeB" name="mode" value="B">
                 <label for="modeB">
                     <strong>Mode B: Clean Paragraph</strong>
-                    <span>Preserve paragraph structure, fix formatting</span>
+                    <span>Preserve all structure, fix paragraph formatting</span>
                 </label>
             </div>
             <div class="mode-option">
                 <input type="radio" id="modeC" name="mode" value="C">
                 <label for="modeC">
                     <strong>Mode C: Hard Normalization</strong>
-                    <span>Aggressive cleanup for heavily broken text</span>
+                    <span>Aggressive cleanup, preserve marked structure</span>
                 </label>
             </div>
         </div>
@@ -47,7 +47,14 @@
                     <span id="inputLineCount">Lines: 0</span>
                 </div>
             </div>
-            <textarea id="inputText" placeholder="Paste your text here... Supports batch input with blank line separation."></textarea>
+            <textarea id="inputText" placeholder="Paste your text here... Supports batch input with blank line separation.
+
+Example:
+# Main Heading
+This is   text with  multiple   spaces.
+- List item 1
+- List item 2
+Visit https://example.com"></textarea>
             <div class="button-group">
                 <button id="clearBtn" class="btn secondary">
                     <i class="fas fa-trash-alt"></i> Clear Input
@@ -95,13 +102,17 @@
 
         <div class="info-section">
             <div class="info-box">
-                <h3><i class="fas fa-shield-alt"></i> Protected Content</h3>
-                <p>These elements are preserved exactly:</p>
+                <h3><i class="fas fa-shield-alt"></i> Preserved Elements</h3>
+                <p>These elements are protected from changes:</p>
                 <ul>
                     <li>URLs and email addresses</li>
-                    <li>Text inside backticks: <code>`like this`</code></li>
-                    <li>Inline code fragments</li>
-                    <li>File paths and code blocks</li>
+                    <li>Text inside backticks: <code>`code`</code></li>
+                    <li>Code blocks (```code```)</li>
+                    <li>Headings (#, ##, &lt;h1&gt;)</li>
+                    <li>Lists (*, -, 1., &lt;li&gt;)</li>
+                    <li>Blockquotes (&gt; text)</li>
+                    <li>HTML tags and formatting</li>
+                    <li>File paths and special syntax</li>
                 </ul>
             </div>
             <div class="info-box">
@@ -112,12 +123,14 @@
                     <li>Fix grammar or improve clarity</li>
                     <li>Summarize or shorten content</li>
                     <li>Alter punctuation or casing</li>
+                    <li>Remove document structure</li>
                 </ul>
             </div>
         </div>
 
         <footer>
-            <p>Space Wrapper - Deterministic Text Formatting Tool</p>
+            <p>Space Wrapper - Deterministic Text Formatting Tool v2.0</p>
+            <p class="footer-note">Preserves document structure while normalizing spacing</p>
         </footer>
     </div>
 
